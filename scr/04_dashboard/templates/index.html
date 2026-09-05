@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FP&A Executive Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 1rem;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+<div class="min-h-screen p-6 md:p-10 max-w-7xl mx-auto">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">FP&A Intelligence</h1>
+            <p class="text-slate-500 text-sm mt-1">Análise de Desempenho e Variação OPEX</p>
+        </div>
+        
+        <!-- Filters -->
+        <div class="mt-4 md:mt-0 flex flex-wrap gap-4 items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Filtros:</span>
+            <select id="filter-quarter" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block p-2">
+                <option value="Todos">Todos Trimestres</option>
+            </select>
+            <select id="filter-dept" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block p-2">
+                <option value="Todos">Todos Departamentos</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- Insights Row -->
+    <div class="glass-card p-6 mb-8 border-l-4 border-l-blue-500">
+        <h3 class="text-slate-800 font-semibold mb-3 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Smart Insights
+        </h3>
+        <ul id="insights-list" class="list-disc pl-5 text-sm text-slate-600 space-y-1">
+            <li>Carregando insights...</li>
+        </ul>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="glass-card p-6">
+            <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Budget Total</h3>
+            <div class="text-3xl font-bold text-slate-800" id="kpi-budget">--</div>
+        </div>
+        <div class="glass-card p-6">
+            <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Actual (Realizado)</h3>
+            <div class="text-3xl font-bold text-slate-800" id="kpi-actual">--</div>
+        </div>
+        <div class="glass-card p-6">
+            <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Variação (R$)</h3>
+            <div class="text-3xl font-bold" id="kpi-var-abs">--</div>
+        </div>
+        <div class="glass-card p-6">
+            <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Variação (%)</h3>
+            <div class="text-3xl font-bold" id="kpi-var-pct">--</div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="glass-card p-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Análise de Departamentos</h3>
+            <div id="chart-departments" class="w-full h-80"></div>
+        </div>
+        <div class="glass-card p-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Tendência Mensal (Burn Rate)</h3>
+            <div id="chart-trend" class="w-full h-80"></div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="glass-card p-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Matriz de Materialidade (Dispersão)</h3>
+            <div id="chart-scatter" class="w-full h-80"></div>
+        </div>
+        
+        <!-- What-if Simulator -->
+        <div class="glass-card p-6 bg-slate-800 text-white border-none">
+            <h3 class="text-lg font-semibold text-white mb-2 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                Simulador What-If
+            </h3>
+            <p class="text-sm text-slate-400 mb-6">Reduza cortes orçamentários (Budget) linearmente para avaliar o impacto imediato na Variação Final.</p>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-300 mb-2">Corte Global de Budget (%): <span id="cut-val" class="text-indigo-400 font-bold">0%</span></label>
+                <input type="range" id="sim-cut" min="0" max="30" value="0" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+            </div>
+            
+            <div class="bg-slate-700/50 p-4 rounded-lg mt-6">
+                <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Novo Budget Simulado:</div>
+                <div class="text-2xl font-bold text-white mb-4" id="sim-budget">R$ 0</div>
+                
+                <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Nova Variação Simulada (R$):</div>
+                <div class="text-2xl font-bold" id="sim-var">R$ 0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="glass-card p-6 mb-10">
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Detalhamento por Área</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-slate-600">
+                <thead class="text-xs text-slate-400 uppercase bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-4 font-semibold">Departamento</th>
+                        <th class="px-6 py-4 font-semibold text-right">Budget</th>
+                        <th class="px-6 py-4 font-semibold text-right">Actual</th>
+                        <th class="px-6 py-4 font-semibold text-right">Variação</th>
+                        <th class="px-6 py-4 font-semibold text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
+    const formatPct = (val) => (val > 0 ? '+' : '') + val.toFixed(1) + '%';
+    const colorRed = '#ef4444';
+    const colorGreen = '#10b981';
+    
+    let currentKpiData = null; // Store for simulation
+    
+    // Configura listeners
+    document.getElementById('filter-quarter').addEventListener('change', loadData);
+    document.getElementById('filter-dept').addEventListener('change', loadData);
+    
+    document.getElementById('sim-cut').addEventListener('input', (e) => {
+        const cut = e.target.value;
+        document.getElementById('cut-val').innerText = cut + '%';
+        if(currentKpiData) simulateWhatIf(cut, currentKpiData);
+    });
+
+    async function initFilters() {
+        const res = await fetch('/api/filters');
+        const data = await res.json();
+        
+        const qSelect = document.getElementById('filter-quarter');
+        qSelect.innerHTML = '';
+        data.quarters.forEach(q => qSelect.add(new Option(q, q)));
+        
+        const dSelect = document.getElementById('filter-dept');
+        dSelect.innerHTML = '';
+        data.departments.forEach(d => dSelect.add(new Option(d, d)));
+    }
+    
+    function getFilterParams() {
+        const q = document.getElementById('filter-quarter').value || 'Todos';
+        const d = document.getElementById('filter-dept').value || 'Todos';
+        return `?quarter=${q}&dept=${d}`;
+    }
+
+    async function loadData() {
+        try {
+            const params = getFilterParams();
+            
+            // KPIs
+            const resKpi = await fetch('/api/kpis' + params);
+            currentKpiData = await resKpi.json();
+            
+            document.getElementById('kpi-budget').innerText = formatCurrency(currentKpiData.budget);
+            document.getElementById('kpi-actual').innerText = formatCurrency(currentKpiData.actual);
+            
+            const varAbsEl = document.getElementById('kpi-var-abs');
+            varAbsEl.innerText = formatCurrency(currentKpiData.variance);
+            varAbsEl.style.color = currentKpiData.variance > 0 ? colorRed : colorGreen;
+            
+            const varPctEl = document.getElementById('kpi-var-pct');
+            varPctEl.innerText = formatPct(currentKpiData.variance_pct);
+            varPctEl.style.color = currentKpiData.variance_pct > 0 ? colorRed : colorGreen;
+            
+            // Simulation Reset
+            document.getElementById('sim-cut').value = 0;
+            document.getElementById('cut-val').innerText = '0%';
+            simulateWhatIf(0, currentKpiData);
+            
+            // Insights
+            const resInsights = await fetch('/api/insights' + params);
+            const dataInsights = await resInsights.json();
+            const ul = document.getElementById('insights-list');
+            ul.innerHTML = '';
+            dataInsights.insights.forEach(ins => {
+                const htmlStr = ins.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                const li = document.createElement('li');
+                li.innerHTML = htmlStr;
+                ul.appendChild(li);
+            });
+            
+            // Departamentos
+            const resDept = await fetch('/api/departments' + params);
+            const dataDept = await resDept.json();
+            renderTable(dataDept);
+            renderChartDept(dataDept);
+            renderChartScatter(dataDept);
+            
+            // Tendencia
+            const resTrend = await fetch('/api/trend' + params);
+            const dataTrend = await resTrend.json();
+            renderChartTrend(dataTrend);
+            
+        } catch(e) {
+            console.error("Erro ao carregar dados", e);
+        }
+    }
+    
+    function simulateWhatIf(cutPct, data) {
+        const cutMultiplier = 1 - (cutPct / 100);
+        const simBudget = data.budget * cutMultiplier;
+        const simVar = data.actual - simBudget;
+        
+        document.getElementById('sim-budget').innerText = formatCurrency(simBudget);
+        
+        const simVarEl = document.getElementById('sim-var');
+        simVarEl.innerText = formatCurrency(simVar);
+        simVarEl.style.color = simVar > 0 ? '#f87171' : '#34d399';
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+        data.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 transition-colors';
+            const statusColor = d.Variance > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700';
+            const statusText = d.Variance > 0 ? 'Overrun' : 'Saving';
+            tr.innerHTML = `
+                <td class="px-6 py-4 font-medium text-slate-800">${d.Department}</td>
+                <td class="px-6 py-4 text-right">${formatCurrency(d.Budget)}</td>
+                <td class="px-6 py-4 text-right">${formatCurrency(d.Actual)}</td>
+                <td class="px-6 py-4 text-right font-semibold" style="color: ${d.Variance > 0 ? colorRed : colorGreen}">
+                    ${formatCurrency(d.Variance)}
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor}">${statusText}</span>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    
+    function renderChartDept(data) {
+        const chartDom = document.getElementById('chart-departments');
+        const myChart = echarts.init(chartDom);
+        const option = {
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            legend: { data: ['Budget', 'Actual'], bottom: 0, icon: 'circle' },
+            grid: { left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true },
+            xAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } } },
+            yAxis: { type: 'category', data: data.map(d => d.Department), axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#475569', fontWeight: 500 } },
+            series: [
+                { name: 'Budget', type: 'bar', data: data.map(d => d.Budget), itemStyle: { color: '#cbd5e1', borderRadius: [0, 4, 4, 0] } },
+                { name: 'Actual', type: 'bar', data: data.map(d => d.Actual), itemStyle: { color: (params) => { return data[params.dataIndex].Variance > 0 ? '#ef4444' : '#0ea5e9'; }, borderRadius: [0, 4, 4, 0] } }
+            ]
+        };
+        myChart.setOption(option, true);
+        window.addEventListener('resize', () => myChart.resize());
+    }
+    
+    function renderChartTrend(data) {
+        const chartDom = document.getElementById('chart-trend');
+        const myChart = echarts.init(chartDom);
+        const option = {
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['Budget', 'Actual'], bottom: 0, icon: 'circle' },
+            grid: { left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true },
+            xAxis: { type: 'category', data: data.map(d => d.Month_Label), axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#475569' } },
+            yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } } },
+            series: [
+                { name: 'Budget', type: 'line', data: data.map(d => d.Budget), smooth: true, lineStyle: { width: 3, color: '#94a3b8', type: 'dashed' }, itemStyle: { color: '#94a3b8' }, symbol: 'none' },
+                { name: 'Actual', type: 'line', data: data.map(d => d.Actual), smooth: true, lineStyle: { width: 3, color: '#3b82f6' }, itemStyle: { color: '#3b82f6' }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [ { offset: 0, color: 'rgba(59, 130, 246, 0.4)' }, { offset: 1, color: 'rgba(59, 130, 246, 0.05)' } ]) } }
+            ]
+        };
+        myChart.setOption(option, true);
+        window.addEventListener('resize', () => myChart.resize());
+    }
+    
+    function renderChartScatter(data) {
+        const chartDom = document.getElementById('chart-scatter');
+        const myChart = echarts.init(chartDom);
+        const scatterData = data.map(d => [d.Budget, d.Variance_pct, d.Department]);
+        const option = {
+            tooltip: { formatter: function (param) { return `<b>${param.data[2]}</b><br/>Budget: ${formatCurrency(param.data[0])}<br/>Variação: ${param.data[1].toFixed(2)}%`; } },
+            grid: { left: '10%', right: '10%', bottom: '15%', top: '5%' },
+            xAxis: { type: 'value', name: 'Volume (Budget)', nameLocation: 'middle', nameGap: 30, splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } }, axisLabel: { formatter: (value) => (value/1000) + 'k' } },
+            yAxis: { type: 'value', name: 'Variação (%)', splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } } },
+            visualMap: { show: false, dimension: 1, pieces: [ { min: 0, color: '#ef4444' }, { max: 0, color: '#10b981' } ] },
+            series: [{ type: 'scatter', symbolSize: 20, data: scatterData, itemStyle: { opacity: 0.8, borderColor: '#fff', borderWidth: 1 } }]
+        };
+        myChart.setOption(option, true);
+        window.addEventListener('resize', () => myChart.resize());
+    }
+    
+    // Execução Inicial
+    initFilters().then(loadData);
+</script>
+</body>
+</html>
